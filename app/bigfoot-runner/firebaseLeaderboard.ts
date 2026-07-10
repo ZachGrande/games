@@ -14,7 +14,7 @@ import {
   query,
   serverTimestamp,
 } from "firebase/firestore";
-import { getDb, getFirebaseAuth } from "../firebase";
+import { auth, db } from "../firebase";
 import {
   OfflineLeaderboard,
   type LeaderboardProvider,
@@ -38,7 +38,7 @@ export class FirebaseLeaderboard implements LeaderboardProvider {
   async getScores(limit = DEFAULT_LIMIT): Promise<ScoreEntry[]> {
     try {
       const q = query(
-        collection(getDb(), COLLECTION),
+        collection(db, COLLECTION),
         orderBy("score", "desc"),
         fbLimit(limit),
       );
@@ -58,9 +58,8 @@ export class FirebaseLeaderboard implements LeaderboardProvider {
 
   async addScore(entry: ScoreEntry, limit = DEFAULT_LIMIT): Promise<ScoreEntry[]> {
     try {
-      const auth = getFirebaseAuth();
       const user = auth.currentUser ?? (await signInAnonymously(auth)).user;
-      await addDoc(collection(getDb(), COLLECTION), {
+      await addDoc(collection(db, COLLECTION), {
         name: entry.name,
         score: entry.score,
         uid: user.uid,
