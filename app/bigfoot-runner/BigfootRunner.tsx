@@ -22,23 +22,35 @@ import {
   drawTreeSilhouette,
 } from "./draw";
 import Leaderboard from "./Leaderboard";
+import { DebugLadybugToggle, DebugOverlay } from "./DebugUi";
 import ScoreEntry from "./ScoreEntry";
 import { getRememberedName } from "./leaderboardStore";
 import { useLeaderboard } from "./useLeaderboard";
 
 const BEST_KEY = "bigfoot-runner-best";
+const MAX_DEVICE_PIXEL_RATIO = 1.75;
+const FRAME_MS_60FPS = 1000 / 60;
 
 type GameState = "title" | "playing" | "gameover";
 
 export default function BigfootRunner() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const debugEnabledRef = useRef(false);
 
   const [gameState, setGameState] = useState<GameState>("title");
   const [score, setScore] = useState(0);
   const [best, setBest] = useState(0);
   const [speedLabel, setSpeedLabel] = useState("1x");
+  const [debugEnabled, setDebugEnabled] = useState(false);
+  const [debugFps, setDebugFps] = useState(60);
+  const [debugDt, setDebugDt] = useState(FRAME_MS_60FPS);
+  const [debugDpr, setDebugDpr] = useState(1);
 
   const { scores, loading, refresh, saveScore } = useLeaderboard();
+
+  useEffect(() => {
+    debugEnabledRef.current = debugEnabled;
+  }, [debugEnabled]);
 
   // Imperative handle so the React overlay buttons can start the game.
   const startGameRef = useRef<() => void>(() => {});
@@ -62,10 +74,18 @@ export default function BigfootRunner() {
     let speed = 4;
     let gameOver = false;
     let footprintTimer = 0;
+    let renderStepFrames = 1;
     let animId = 0;
+    let lastFrameTs = 0;
+    let lastDebugPublishTs = 0;
     let lastObstacle = 0;
     let lastCollectible = 0;
     let gameOverTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    let skyGradient: CanvasGradient | null = null;
+    let sunGradient: CanvasGradient | null = null;
+    let groundGradient: CanvasGradient | null = null;
+    let vignetteGradient: CanvasGradient | null = null;
 
     let obstacles: Obstacle[] = [];
     let collectibles: Collectible[] = [];
@@ -112,7 +132,8 @@ export default function BigfootRunner() {
 
     // ── Canvas sizing (DPR-aware) ───────────────────────────────────────────
     function setupCanvas() {
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(window.devicePixelRatio || 1, MAX_DEVICE_PIXEL_RATIO);
+      setDebugDpr(dpr);
       W = Math.min(760, canvas!.parentElement!.getBoundingClientRect().width);
       // Narrow (mobile) viewports get a taller, more portrait aspect so the play
       // area isn't cramped; desktop keeps the original 0.6 landscape ratio.
@@ -130,6 +151,28 @@ export default function BigfootRunner() {
       canvas!.style.height = H + "px";
       ctx!.setTransform(1, 0, 0, 1, 0, 0);
       ctx!.scale(dpr, dpr);
+      skyGradient = ctx!.createLinearGradient(0, 0, 0, GROUND_Y);
+      skyGradient.addColorStop(0, "#5ba8e0");
+      skyGradient.addColorStop(0.55, "#a8d8f0");
+      skyGradient.addColorStop(1, "#c8eac0");
+
+      sunGradient = ctx!.createRadialGradient(W * 0.88, 18, 0, W * 0.88, 18, 80);
+      sunGradient.addColorStop(0, "rgba(255,245,180,0.95)");
+      sunGradient.addColorStop(0.25, "rgba(255,225,120,0.4)");
+      sunGradient.addColorStop(1, "transparent");
+
+      groundGradient = ctx!.createLinearGradient(0, GROUND_Y, 0, H);
+      groundGradient.addColorStop(0, "#4caf50");
+      groundGradient.addColorStop(0.12, "#388e3c");
+      groundGradient.addColorStop(0.4, "#5c3d1e");
+      groundGradient.addColorStop(1, "#3a2610");
+
+      vignetteGradient = ctx!.createLinearGradient(0, 0, W, 0);
+      vignetteGradient.addColorStop(0, "rgba(20,60,20,0.3)");
+      vignetteGradient.addColorStop(0.15, "transparent");
+      vignetteGradient.addColorStop(0.85, "transparent");
+      vignetteGradient.addColorStop(1, "rgba(20,60,20,0.3)");
+
       if (BF.y === 0) BF.y = GROUND_Y;
     }
 
@@ -177,18 +220,10 @@ export default function BigfootRunner() {
     function drawBackground() {
       const c = ctx!;
       const moving = state === "playing";
-      const skyGrad = c.createLinearGradient(0, 0, 0, GROUND_Y);
-      skyGrad.addColorStop(0, "#5ba8e0");
-      skyGrad.addColorStop(0.55, "#a8d8f0");
-      skyGrad.addColorStop(1, "#c8eac0");
-      c.fillStyle = skyGrad;
+      c.fillStyle = skyGradient ?? "#a8d8f0";
       c.fillRect(0, 0, W, GROUND_Y);
 
-      const sunGrad = c.createRadialGradient(W * 0.88, 18, 0, W * 0.88, 18, 80);
-      sunGrad.addColorStop(0, "rgba(255,245,180,0.95)");
-      sunGrad.addColorStop(0.25, "rgba(255,225,120,0.4)");
-      sunGrad.addColorStop(1, "transparent");
-      c.fillStyle = sunGrad;
+      c.fillStyle = sunGradient ?? "transparent";
       c.fillRect(0, 0, W, GROUND_Y);
 
       c.fillStyle = "#fff8c0";
@@ -218,7 +253,7 @@ export default function BigfootRunner() {
       c.restore();
 
       bgLayer1.forEach((t) => {
-        if (moving) t.x -= t.spd * (speed / 4);
+        if (moving) t.x -= t.spd * (speed / 4) * renderStepFrames;
         if (t.x + t.w < 0) {
           t.x = W + t.w;
           t.h = 55 + Math.random() * 30;
@@ -228,7 +263,7 @@ export default function BigfootRunner() {
       });
 
       bgLayer2.forEach((t) => {
-        if (moving) t.x -= t.spd * (speed / 4);
+        if (moving) t.x -= t.spd * (speed / 4) * renderStepFrames;
         if (t.x + t.w < 0) {
           t.x = W + t.w;
           t.h = 70 + Math.random() * 40;
@@ -254,12 +289,7 @@ export default function BigfootRunner() {
     function drawGround() {
       const c = ctx!;
       const moving = state === "playing";
-      const gg = c.createLinearGradient(0, GROUND_Y, 0, H);
-      gg.addColorStop(0, "#4caf50");
-      gg.addColorStop(0.12, "#388e3c");
-      gg.addColorStop(0.4, "#5c3d1e");
-      gg.addColorStop(1, "#3a2610");
-      c.fillStyle = gg;
+      c.fillStyle = groundGradient ?? "#4caf50";
       c.fillRect(0, GROUND_Y, W, H - GROUND_Y);
 
       c.strokeStyle = "#66bb6a";
@@ -270,7 +300,7 @@ export default function BigfootRunner() {
       c.stroke();
 
       groundDetails.forEach((d) => {
-        if (moving) d.x -= speed * 0.85;
+        if (moving) d.x -= speed * 0.85 * renderStepFrames;
         if (d.x < -20) d.x = W + 20;
         const s = d.scale;
         if (d.type === "fern") {
@@ -314,7 +344,7 @@ export default function BigfootRunner() {
       });
 
       bgLayer3.forEach((t) => {
-        if (moving) t.x -= t.spd * (speed / 4);
+        if (moving) t.x -= t.spd * (speed / 4) * renderStepFrames;
         if (t.x + t.w < 0) {
           t.x = W + t.w;
           t.h = 90 + Math.random() * 50;
@@ -412,6 +442,8 @@ export default function BigfootRunner() {
       frame = 0;
       speed = 4;
       gameOver = false;
+      footprintTimer = 0;
+      lastFrameTs = 0;
       BF.y = GROUND_Y;
       BF.vy = 0;
       BF.jumping = false;
@@ -436,7 +468,7 @@ export default function BigfootRunner() {
       setGameState("playing");
       publishHud();
       if (animId) cancelAnimationFrame(animId);
-      loop();
+      animId = requestAnimationFrame(loop);
     }
     startGameRef.current = startGame;
 
@@ -452,24 +484,24 @@ export default function BigfootRunner() {
       }
     }
 
-    function update() {
-      frame++;
+    function update(stepFrames: number) {
+      frame += stepFrames;
       scoreVal = Math.floor(frame / 6);
       speed = 4 + Math.min(scoreVal / 200, 5);
-      BF.vy += 0.7;
-      BF.y += BF.vy;
+      BF.vy += 0.7 * stepFrames;
+      BF.y += BF.vy * stepFrames;
       if (BF.y >= GROUND_Y) {
         BF.y = GROUND_Y;
         BF.vy = 0;
         BF.jumping = false;
         BF.doubleJumped = false;
       }
-      footprintTimer++;
+      footprintTimer += stepFrames;
       if (footprintTimer > 18 && !BF.jumping) {
         footprintTimer = 0;
         footprints.push({ x: BF.x + BF.w / 2, y: GROUND_Y + 8, alpha: 0.7 });
       }
-      footprints.forEach((fp) => (fp.alpha -= 0.004));
+      footprints.forEach((fp) => (fp.alpha -= 0.004 * stepFrames));
       footprints = footprints.filter((fp) => fp.alpha > 0);
 
       const minGap = Math.max(180, 350 - scoreVal * 0.5);
@@ -482,9 +514,9 @@ export default function BigfootRunner() {
         lastCollectible = frame;
       }
 
-      obstacles.forEach((o) => (o.x -= speed));
+      obstacles.forEach((o) => (o.x -= speed * stepFrames));
       obstacles = obstacles.filter((o) => o.x > -80);
-      collectibles.forEach((c) => (c.x -= speed));
+      collectibles.forEach((c) => (c.x -= speed * stepFrames));
       collectibles = collectibles.filter((c) => c.x > -60 && !c.collected);
 
       const bfRect: Rect = {
@@ -518,13 +550,13 @@ export default function BigfootRunner() {
 
       particles.forEach((p) => {
         if (p.isText) {
-          p.y += p.vy;
-          p.life -= p.decay;
+          p.y += p.vy * stepFrames;
+          p.life -= p.decay * stepFrames;
         } else {
-          p.x += p.vx ?? 0;
-          p.y += p.vy;
-          p.vy += 0.15;
-          p.life -= p.decay;
+          p.x += (p.vx ?? 0) * stepFrames;
+          p.y += p.vy * stepFrames;
+          p.vy += 0.15 * stepFrames;
+          p.life -= p.decay * stepFrames;
         }
       });
       particles = particles.filter((p) => p.life > 0);
@@ -561,18 +593,23 @@ export default function BigfootRunner() {
       drawBigfoot(c, BF);
       drawParticles();
       drawTextParticles();
-      const vig = c.createLinearGradient(0, 0, W, 0);
-      vig.addColorStop(0, "rgba(20,60,20,0.3)");
-      vig.addColorStop(0.15, "transparent");
-      vig.addColorStop(0.85, "transparent");
-      vig.addColorStop(1, "rgba(20,60,20,0.3)");
-      c.fillStyle = vig;
+      c.fillStyle = vignetteGradient ?? "transparent";
       c.fillRect(0, 0, W, H);
     }
 
-    function loop() {
+    function loop(ts: number) {
       if (state !== "playing") return;
-      update();
+      if (!lastFrameTs) lastFrameTs = ts;
+      const dtMs = Math.min(50, Math.max(0, ts - lastFrameTs || FRAME_MS_60FPS));
+      lastFrameTs = ts;
+      const stepFrames = dtMs / FRAME_MS_60FPS;
+      renderStepFrames = stepFrames;
+      update(stepFrames);
+      if (debugEnabledRef.current && ts - lastDebugPublishTs > 120) {
+        lastDebugPublishTs = ts;
+        setDebugDt(Math.round(dtMs * 10) / 10);
+        setDebugFps(Math.round(1000 / Math.max(dtMs, 1)));
+      }
       draw();
       if (!gameOver) animId = requestAnimationFrame(loop);
       else draw();
@@ -582,6 +619,7 @@ export default function BigfootRunner() {
     let titleRaf = 0;
     function titleDraw() {
       if (state === "title") {
+        renderStepFrames = 1;
         draw();
         titleRaf = requestAnimationFrame(titleDraw);
       }
@@ -656,10 +694,14 @@ export default function BigfootRunner() {
   }, []);
 
   return (
-    <div className="mx-auto w-full max-w-190 font-mono">
+    <div className="relative mx-auto w-full max-w-190 font-mono">
+      <DebugLadybugToggle enabled={debugEnabled} onToggle={() => setDebugEnabled((v) => !v)} />
+
       <div className="relative overflow-hidden rounded-2xl border-2 border-[#2d6e2d] shadow-[0_10px_30px_-10px_rgba(20,60,20,0.6)]">
         {/* Canvas */}
         <canvas ref={canvasRef} className="block w-full cursor-pointer" />
+
+        <DebugOverlay visible={debugEnabled} fps={debugFps} dtMs={debugDt} dpr={debugDpr} />
 
         {/* HUD */}
         <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex justify-between gap-2">
