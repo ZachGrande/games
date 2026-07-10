@@ -3,9 +3,11 @@ packages:
 
 allowBuilds:
   '@firebase/util': true
+  esbuild: true
   protobufjs: true
   sharp: false
   unrs-resolver: false
+  workerd: true
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
