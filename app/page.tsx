@@ -11,6 +11,11 @@ const games = [
     title: "Match Two",
     description: "Flip the cards and find every pair.",
   },
+  {
+    href: "/twenty-forty-eight",
+    title: "2048",
+    description: "Slide the tiles and merge your way to 2048.",
+  },
 ];
 
 export default function Home() {
