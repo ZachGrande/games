@@ -16,6 +16,7 @@ import {
   drawBigfoot,
   drawBirchTree,
   drawCollectible,
+  drawEmojiSprite,
   drawObstacle,
   drawOakTree,
   drawPineTree,
@@ -402,45 +403,40 @@ export function useBigfootGame(): BigfootGame {
     // ── Particle / footprint drawers ────────────────────────────────────────
     function drawFootprints() {
       const c = ctx!;
-      footprints.forEach((fp) => {
-        c.save();
-        c.globalAlpha = fp.alpha;
-        c.font = "11px serif";
-        c.textAlign = "center";
-        c.textBaseline = "bottom";
-        c.fillText("👣", fp.x, fp.y);
-        c.restore();
-      });
+      for (let i = 0; i < footprints.length; i++) {
+        const fp = footprints[i];
+        drawEmojiSprite(c, "👣", 11, fp.x, fp.y, fp.alpha);
+      }
     }
 
     function drawParticles() {
       const c = ctx!;
-      particles
-        .filter((p) => !p.isText)
-        .forEach((p) => {
-          c.save();
-          c.globalAlpha = p.life;
-          c.fillStyle = p.color ?? "#fff";
-          c.beginPath();
-          c.arc(p.x, p.y, (p.r ?? 3) * p.life, 0, Math.PI * 2);
-          c.fill();
-          c.restore();
-        });
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        if (p.isText) continue;
+        c.save();
+        c.globalAlpha = p.life;
+        c.fillStyle = p.color ?? "#fff";
+        c.beginPath();
+        c.arc(p.x, p.y, (p.r ?? 3) * p.life, 0, Math.PI * 2);
+        c.fill();
+        c.restore();
+      }
     }
 
     function drawTextParticles() {
       const c = ctx!;
-      particles
-        .filter((p) => p.isText)
-        .forEach((p) => {
-          c.save();
-          c.globalAlpha = Math.min(p.life, 1);
-          c.fillStyle = p.color ?? "#fff";
-          c.font = 'bold 16px "Courier New"';
-          c.textAlign = "center";
-          c.fillText(p.text ?? "", p.x, p.y);
-          c.restore();
-        });
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        if (!p.isText) continue;
+        c.save();
+        c.globalAlpha = Math.min(p.life, 1);
+        c.fillStyle = p.color ?? "#fff";
+        c.font = 'bold 16px "Courier New"';
+        c.textAlign = "center";
+        c.fillText(p.text ?? "", p.x, p.y);
+        c.restore();
+      }
     }
 
     // ── Game loop ───────────────────────────────────────────────────────────
@@ -508,8 +504,13 @@ export function useBigfootGame(): BigfootGame {
         footprintTimer = 0;
         footprints.push({ x: BF.x + BF.w / 2, y: GROUND_Y + 8, alpha: 0.7 });
       }
-      footprints.forEach((fp) => (fp.alpha -= 0.004 * stepFrames));
-      footprints = footprints.filter((fp) => fp.alpha > 0);
+      let fpWrite = 0;
+      for (let i = 0; i < footprints.length; i++) {
+        const fp = footprints[i];
+        fp.alpha -= 0.004 * stepFrames;
+        if (fp.alpha > 0) footprints[fpWrite++] = fp;
+      }
+      footprints.length = fpWrite;
 
       const minGap = Math.max(180, 350 - scoreVal * 0.5);
       if (frame - lastObstacle > (minGap / speed) * 4) {
@@ -521,10 +522,20 @@ export function useBigfootGame(): BigfootGame {
         lastCollectible = frame;
       }
 
-      obstacles.forEach((o) => (o.x -= speed * stepFrames));
-      obstacles = obstacles.filter((o) => o.x > -80);
-      collectibles.forEach((c) => (c.x -= speed * stepFrames));
-      collectibles = collectibles.filter((c) => c.x > -60 && !c.collected);
+      let obWrite = 0;
+      for (let i = 0; i < obstacles.length; i++) {
+        const o = obstacles[i];
+        o.x -= speed * stepFrames;
+        if (o.x > -80) obstacles[obWrite++] = o;
+      }
+      obstacles.length = obWrite;
+      let colWrite = 0;
+      for (let i = 0; i < collectibles.length; i++) {
+        const cItem = collectibles[i];
+        cItem.x -= speed * stepFrames;
+        if (cItem.x > -60 && !cItem.collected) collectibles[colWrite++] = cItem;
+      }
+      collectibles.length = colWrite;
 
       const bfRect: Rect = {
         x: BF.x,
@@ -555,7 +566,9 @@ export function useBigfootGame(): BigfootGame {
         }
       });
 
-      particles.forEach((p) => {
+      let ptWrite = 0;
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
         if (p.isText) {
           p.y += p.vy * stepFrames;
           p.life -= p.decay * stepFrames;
@@ -565,8 +578,9 @@ export function useBigfootGame(): BigfootGame {
           p.vy += 0.15 * stepFrames;
           p.life -= p.decay * stepFrames;
         }
-      });
-      particles = particles.filter((p) => p.life > 0);
+        if (p.life > 0) particles[ptWrite++] = p;
+      }
+      particles.length = ptWrite;
 
       publishHud();
     }

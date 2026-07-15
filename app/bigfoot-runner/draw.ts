@@ -1,6 +1,9 @@
 // Pure canvas drawing helpers + type tables for Bigfoot Runner.
 // Every function here only touches the passed-in CanvasRenderingContext2D and
-// numeric arguments — no React state, no DOM lookups.
+// numeric arguments — no React state. The one exception is the emoji sprite
+// cache below, which pre-rasterizes color-emoji glyphs into offscreen canvases
+// so the game loop can blit them with drawImage instead of re-running the (very
+// expensive) fillText glyph shaping every frame.
 
 export interface ObstacleType {
   type: string;
@@ -70,6 +73,70 @@ export interface Bigfoot {
   doubleJumped: boolean;
   legPhase: number;
   getTop(): number;
+}
+
+// ── EMOJI SPRITE CACHE ───────────────────────────────────────────────────────
+// Color emoji are drawn as center-x / bottom-baseline anchored glyphs. We render
+// each (emoji, fontPx) combo once into a supersampled offscreen canvas and then
+// blit it, which matches the original fillText placement pixel-for-pixel while
+// avoiding per-frame glyph rasterization.
+
+interface EmojiSprite {
+  canvas: HTMLCanvasElement;
+  w: number;
+  h: number;
+  anchorX: number;
+  anchorY: number;
+}
+
+const emojiSpriteCache = new Map<string, EmojiSprite>();
+
+function getEmojiSprite(emoji: string, fontPx: number): EmojiSprite {
+  const ss = Math.min(typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1, 2);
+  const key = `${emoji}|${fontPx}|${ss}`;
+  const cached = emojiSpriteCache.get(key);
+  if (cached) return cached;
+  const w = Math.ceil(fontPx * 1.8);
+  const h = Math.ceil(fontPx * 1.8);
+  const anchorX = w / 2;
+  const anchorY = h - 1;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(w * ss);
+  canvas.height = Math.ceil(h * ss);
+  const octx = canvas.getContext("2d");
+  if (octx) {
+    octx.scale(ss, ss);
+    octx.font = `${fontPx}px serif`;
+    octx.textAlign = "center";
+    octx.textBaseline = "bottom";
+    octx.fillText(emoji, anchorX, anchorY);
+  }
+  const sprite: EmojiSprite = { canvas, w, h, anchorX, anchorY };
+  emojiSpriteCache.set(key, sprite);
+  return sprite;
+}
+
+// Blits a cached emoji so its horizontal center lands on centerX and its bottom
+// baseline lands on bottomY — identical placement to the previous
+// textAlign="center" / textBaseline="bottom" fillText call.
+export function drawEmojiSprite(
+  ctx: CanvasRenderingContext2D,
+  emoji: string,
+  fontPx: number,
+  centerX: number,
+  bottomY: number,
+  alpha = 1,
+) {
+  const sprite = getEmojiSprite(emoji, fontPx);
+  if (alpha !== 1) ctx.globalAlpha = alpha;
+  ctx.drawImage(
+    sprite.canvas,
+    centerX - sprite.anchorX,
+    bottomY - sprite.anchorY,
+    sprite.w,
+    sprite.h,
+  );
+  if (alpha !== 1) ctx.globalAlpha = 1;
 }
 
 // ── TREE DRAWERS ────────────────────────────────────────────────────────────
@@ -655,10 +722,7 @@ export function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, frame: 
   else if (o.type === "campfire") drawCampfireCanvas(ctx, o.x, o.y, o.w, o.h, frame);
   else if (o.type === "lantern") drawCampLanternCanvas(ctx, o.x, o.y, o.w, o.h, frame);
   else if (o.emoji) {
-    ctx.font = `${Math.min(o.w, o.h) * 1.2}px serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "bottom";
-    ctx.fillText(o.emoji, o.x + o.w / 2, o.y + o.h);
+    drawEmojiSprite(ctx, o.emoji, Math.min(o.w, o.h) * 1.2, o.x + o.w / 2, o.y + o.h);
   }
 }
 
