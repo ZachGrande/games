@@ -459,6 +459,52 @@ export function drawCampLanternCanvas(
   ctx.stroke();
 }
 
+// ── LANTERN SPRITE CACHE ─────────────────────────────────────────────────────
+// The lantern is the only obstacle that builds canvas gradients, and it rebuilt
+// two of them on every frame. Its animation is fully quantized — the only
+// frame-dependent inputs are Math.floor(fl * 8) and Math.floor(fl * 5) where
+// fl = sin(frame * 0.15) * 1.2 — so each distinct visual state can be rendered
+// once into an offscreen canvas and blitted. Output is byte-identical to the
+// direct draw, but the gradients are built at most ~30 times total instead of
+// once per lantern per frame.
+
+interface ObstacleSprite {
+  canvas: HTMLCanvasElement;
+  offsetX: number;
+  offsetY: number;
+  w: number;
+  h: number;
+}
+
+const lanternSpriteCache = new Map<string, ObstacleSprite>();
+
+function getLanternSprite(w: number, h: number, frame: number): ObstacleSprite {
+  const ss = Math.min(typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1, 2);
+  const fl = Math.sin(frame * 0.15) * 1.2;
+  const g8 = Math.floor(fl * 8);
+  const g5 = Math.floor(fl * 5);
+  const key = `${w}|${h}|${ss}|${g8}|${g5}`;
+  const cached = lanternSpriteCache.get(key);
+  if (cached) return cached;
+  // Generous padding so the glow rect (starts at x - 0.7w, spans 2.4w) and the
+  // hook arc above y are never clipped.
+  const offsetX = w * 1.3;
+  const offsetY = h * 0.5 + w * 0.5;
+  const logicalW = Math.ceil(offsetX + w * 1.3);
+  const logicalH = Math.ceil(offsetY + h + 15);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(logicalW * ss);
+  canvas.height = Math.ceil(logicalH * ss);
+  const octx = canvas.getContext("2d");
+  if (octx) {
+    octx.scale(ss, ss);
+    drawCampLanternCanvas(octx, offsetX, offsetY, w, h, frame);
+  }
+  const sprite: ObstacleSprite = { canvas, offsetX, offsetY, w: logicalW, h: logicalH };
+  lanternSpriteCache.set(key, sprite);
+  return sprite;
+}
+
 // ── COLLECTIBLE DRAWERS ──────────────────────────────────────────────────────
 
 export function drawStarShape(
@@ -720,8 +766,10 @@ export const COLLECT_TYPES: CollectType[] = [
 export function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, frame: number) {
   if (o.type === "tent") drawTentCanvas(ctx, o.x, o.y, o.w, o.h);
   else if (o.type === "campfire") drawCampfireCanvas(ctx, o.x, o.y, o.w, o.h, frame);
-  else if (o.type === "lantern") drawCampLanternCanvas(ctx, o.x, o.y, o.w, o.h, frame);
-  else if (o.emoji) {
+  else if (o.type === "lantern") {
+    const sprite = getLanternSprite(o.w, o.h, frame);
+    ctx.drawImage(sprite.canvas, o.x - sprite.offsetX, o.y - sprite.offsetY, sprite.w, sprite.h);
+  } else if (o.emoji) {
     drawEmojiSprite(ctx, o.emoji, Math.min(o.w, o.h) * 1.2, o.x + o.w / 2, o.y + o.h);
   }
 }

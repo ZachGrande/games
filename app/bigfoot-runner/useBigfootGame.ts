@@ -90,10 +90,9 @@ export function useBigfootGame(): BigfootGame {
     let lastCollectible = 0;
     let gameOverTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    let skyGradient: CanvasGradient | null = null;
-    let sunGradient: CanvasGradient | null = null;
     let groundGradient: CanvasGradient | null = null;
     let vignetteGradient: CanvasGradient | null = null;
+    let staticBgCanvas: HTMLCanvasElement | null = null;
 
     let obstacles: Obstacle[] = [];
     let collectibles: Collectible[] = [];
@@ -159,15 +158,6 @@ export function useBigfootGame(): BigfootGame {
       canvas!.style.height = H + "px";
       ctx!.setTransform(1, 0, 0, 1, 0, 0);
       ctx!.scale(dpr, dpr);
-      skyGradient = ctx!.createLinearGradient(0, 0, 0, GROUND_Y);
-      skyGradient.addColorStop(0, "#5ba8e0");
-      skyGradient.addColorStop(0.55, "#a8d8f0");
-      skyGradient.addColorStop(1, "#c8eac0");
-
-      sunGradient = ctx!.createRadialGradient(W * 0.88, 18, 0, W * 0.88, 18, 80);
-      sunGradient.addColorStop(0, "rgba(255,245,180,0.95)");
-      sunGradient.addColorStop(0.25, "rgba(255,225,120,0.4)");
-      sunGradient.addColorStop(1, "transparent");
 
       groundGradient = ctx!.createLinearGradient(0, GROUND_Y, 0, H);
       groundGradient.addColorStop(0, "#4caf50");
@@ -181,7 +171,65 @@ export function useBigfootGame(): BigfootGame {
       vignetteGradient.addColorStop(0.85, "transparent");
       vignetteGradient.addColorStop(1, "rgba(20,60,20,0.3)");
 
+      renderStaticBackground();
+
       if (BF.y === 0) BF.y = GROUND_Y;
+    }
+
+    // ── Static background (sky + sun + rays) pre-rendered once per resize ────
+    // These layers never change frame-to-frame, so we rasterize them into an
+    // offscreen canvas and blit it each frame instead of re-filling gradients,
+    // arcs, and the ray loop every time.
+    function renderStaticBackground() {
+      const dpr = Math.min(window.devicePixelRatio || 1, MAX_DEVICE_PIXEL_RATIO);
+      if (!staticBgCanvas) staticBgCanvas = document.createElement("canvas");
+      staticBgCanvas.width = W * dpr;
+      staticBgCanvas.height = GROUND_Y * dpr;
+      const bc = staticBgCanvas.getContext("2d");
+      if (!bc) return;
+      bc.setTransform(1, 0, 0, 1, 0, 0);
+      bc.clearRect(0, 0, staticBgCanvas.width, staticBgCanvas.height);
+      bc.scale(dpr, dpr);
+
+      const sky = bc.createLinearGradient(0, 0, 0, GROUND_Y);
+      sky.addColorStop(0, "#5ba8e0");
+      sky.addColorStop(0.55, "#a8d8f0");
+      sky.addColorStop(1, "#c8eac0");
+      bc.fillStyle = sky;
+      bc.fillRect(0, 0, W, GROUND_Y);
+
+      const sun = bc.createRadialGradient(W * 0.88, 18, 0, W * 0.88, 18, 80);
+      sun.addColorStop(0, "rgba(255,245,180,0.95)");
+      sun.addColorStop(0.25, "rgba(255,225,120,0.4)");
+      sun.addColorStop(1, "transparent");
+      bc.fillStyle = sun;
+      bc.fillRect(0, 0, W, GROUND_Y);
+
+      bc.fillStyle = "#fff8c0";
+      bc.beginPath();
+      bc.arc(W * 0.88, 18, 14, 0, Math.PI * 2);
+      bc.fill();
+      bc.fillStyle = "rgba(255,245,150,0.5)";
+      bc.beginPath();
+      bc.arc(W * 0.88, 18, 22, 0, Math.PI * 2);
+      bc.fill();
+
+      bc.save();
+      bc.globalAlpha = 0.06;
+      for (let i = 0; i < 5; i++) {
+        const angle = -0.3 + i * 0.18;
+        bc.fillStyle = "#ffffc0";
+        bc.beginPath();
+        bc.moveTo(W * 0.88, 18);
+        bc.lineTo(W * 0.88 + Math.cos(angle + Math.PI / 2) * 300, 18 + Math.sin(angle + Math.PI / 2) * 300);
+        bc.lineTo(
+          W * 0.88 + Math.cos(angle + Math.PI / 2 + 0.08) * 300,
+          18 + Math.sin(angle + Math.PI / 2 + 0.08) * 300,
+        );
+        bc.closePath();
+        bc.fill();
+      }
+      bc.restore();
     }
 
     // ── Background ──────────────────────────────────────────────────────────
@@ -228,37 +276,7 @@ export function useBigfootGame(): BigfootGame {
     function drawBackground() {
       const c = ctx!;
       const moving = state === "playing";
-      c.fillStyle = skyGradient ?? "#a8d8f0";
-      c.fillRect(0, 0, W, GROUND_Y);
-
-      c.fillStyle = sunGradient ?? "transparent";
-      c.fillRect(0, 0, W, GROUND_Y);
-
-      c.fillStyle = "#fff8c0";
-      c.beginPath();
-      c.arc(W * 0.88, 18, 14, 0, Math.PI * 2);
-      c.fill();
-      c.fillStyle = "rgba(255,245,150,0.5)";
-      c.beginPath();
-      c.arc(W * 0.88, 18, 22, 0, Math.PI * 2);
-      c.fill();
-
-      c.save();
-      c.globalAlpha = 0.06;
-      for (let i = 0; i < 5; i++) {
-        const angle = -0.3 + i * 0.18;
-        c.fillStyle = "#ffffc0";
-        c.beginPath();
-        c.moveTo(W * 0.88, 18);
-        c.lineTo(W * 0.88 + Math.cos(angle + Math.PI / 2) * 300, 18 + Math.sin(angle + Math.PI / 2) * 300);
-        c.lineTo(
-          W * 0.88 + Math.cos(angle + Math.PI / 2 + 0.08) * 300,
-          18 + Math.sin(angle + Math.PI / 2 + 0.08) * 300,
-        );
-        c.closePath();
-        c.fill();
-      }
-      c.restore();
+      if (staticBgCanvas) c.drawImage(staticBgCanvas, 0, 0, W, GROUND_Y);
 
       bgLayer1.forEach((t) => {
         if (moving) t.x -= t.spd * (speed / 4) * renderStepFrames;
