@@ -2,22 +2,12 @@
 
 import { QRCodeSVG } from "qrcode.react";
 import { playersByJoinOrder } from "../../../lib/format";
-import type { Game } from "../../../lib/types";
+import { kickPlayer, startGame } from "../../../lib/game";
 import PresenceDot from "../../shared/PresenceDot";
+import { useHostGame } from "./HostGameContext";
 
-export default function HostLobby({
-  code,
-  game,
-  pending,
-  onStart,
-  onKick,
-}: {
-  code: string;
-  game: Game;
-  pending: boolean;
-  onStart: () => void;
-  onKick: (uid: string) => void;
-}) {
+export default function HostLobby() {
+  const { code, game, pending, act } = useHostGame();
   const joinUrl = `${window.location.origin}/jeopardy/play/${code}`;
   const players = playersByJoinOrder(game.players);
 
@@ -49,7 +39,7 @@ export default function HostLobby({
                 </span>
                 <button
                   type="button"
-                  onClick={() => onKick(uid)}
+                  onClick={() => act(() => kickPlayer(code, game, uid))}
                   className="text-sm text-blue-300 hover:text-red-300"
                   aria-label={`Remove ${p.name}`}
                 >
@@ -62,7 +52,7 @@ export default function HostLobby({
         <button
           type="button"
           disabled={pending || players.length === 0}
-          onClick={onStart}
+          onClick={() => act(() => startGame(code, game))}
           className="mt-2 rounded-xl bg-amber-400 px-6 py-4 text-xl font-black text-blue-950 transition-colors hover:bg-amber-300 disabled:opacity-40"
         >
           Start game
