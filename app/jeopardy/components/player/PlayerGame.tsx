@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatMoney, ordinal, rankPlayers } from "../lib/format";
+import { formatMoney, ordinal, rankPlayers } from "../../lib/format";
 import {
   buzz,
   buzzQueue,
@@ -10,8 +10,8 @@ import {
   submitFinalAnswer,
   submitFinalWager,
   trackPresence,
-} from "../lib/game";
-import { isValidCode } from "../lib/codes";
+} from "../../lib/game";
+import { isValidCode } from "../../lib/codes";
 import {
   loadPlayerName,
   savePlayerName,
@@ -20,9 +20,9 @@ import {
   useNow,
   usePlayerUser,
   useServerOffset,
-} from "../lib/hooks";
-import { type Game, type PlayerSecret, secondsUntil } from "../lib/types";
-import Standings from "./Standings";
+} from "../../lib/hooks";
+import { type Game, type PlayerSecret, secondsUntil } from "../../lib/types";
+import Standings from "../shared/Standings";
 
 export default function PlayerGame({ code }: { code: string }) {
   const validCode = isValidCode(code);

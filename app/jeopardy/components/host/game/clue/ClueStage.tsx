@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatMoney } from "../lib/format";
+import { clueValueLabel, formatMoney, parseWholeNumber, playersByJoinOrder } from "../../../../lib/format";
 import {
   buzzQueue,
   currentResponder,
@@ -10,25 +10,14 @@ import {
   returnToBoard,
   revealClue,
   setDailyDoubleWager,
-} from "../lib/game";
-import { type Game, type GamePrivate, roundMaxValue } from "../lib/types";
+} from "../../../../lib/game";
+import { type Game, roundMaxValue } from "../../../../lib/types";
+import JudgeButtons from "../../../shared/JudgeButtons";
+import { ACTION_BUTTON as ACTION, TONE } from "../../../shared/ui";
+import { useHostGame } from "../HostGameContext";
 
-const ACTION =
-  "rounded-xl px-5 py-3 text-lg font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
-
-export default function ClueStage({
-  code,
-  game,
-  priv,
-  pending,
-  act,
-}: {
-  code: string;
-  game: Game;
-  priv: GamePrivate;
-  pending: boolean;
-  act: (fn: () => Promise<unknown>) => void;
-}) {
+export default function ClueStage() {
+  const { code, game, priv, pending, act } = useHostGame();
   const current = game.current!;
   const queue = buzzQueue(game);
   const responder = currentResponder(game);
@@ -67,9 +56,7 @@ export default function ClueStage({
     <div className="flex flex-1 flex-col gap-4 p-4 lg:flex-row">
       <section className="flex flex-1 flex-col rounded-xl bg-blue-800 p-6 text-center shadow-lg">
         <p className="text-lg font-semibold uppercase tracking-wide text-blue-200 sm:text-2xl">
-          {current.category} · {current.isDailyDouble && current.wager !== undefined
-            ? `Wager ${formatMoney(current.wager)}`
-            : formatMoney(current.value)}
+          {current.category} · {clueValueLabel(current)}
         </p>
 
         <div className="flex flex-1 flex-col items-center justify-center gap-6 py-6">
@@ -122,24 +109,7 @@ export default function ClueStage({
             <p className="text-center text-white">
               Judging <span className="font-bold text-amber-300">{responderName}</span>
             </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => judge(true)}
-                className={`${ACTION} bg-emerald-500 text-white hover:bg-emerald-400`}
-              >
-                ✓ Correct <kbd className="text-xs opacity-70">C</kbd>
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => judge(false)}
-                className={`${ACTION} bg-red-500 text-white hover:bg-red-400`}
-              >
-                ✗ Wrong <kbd className="text-xs opacity-70">W</kbd>
-              </button>
-            </div>
+            <JudgeButtons className="grid grid-cols-2 gap-2" disabled={pending} onJudge={judge} shortcuts />
           </div>
         )}
 
@@ -149,7 +119,7 @@ export default function ClueStage({
               type="button"
               disabled={pending}
               onClick={open}
-              className={`${ACTION} bg-amber-400 text-blue-950 hover:bg-amber-300`}
+              className={`${ACTION} ${TONE.primary}`}
             >
               Open buzzers <kbd className="text-xs opacity-70">Space</kbd>
             </button>
@@ -159,7 +129,7 @@ export default function ClueStage({
               type="button"
               disabled={pending}
               onClick={reveal}
-              className={`${ACTION} bg-blue-700 text-white hover:bg-blue-600`}
+              className={`${ACTION} ${TONE.secondary}`}
             >
               {current.phase === "open" ? "No one / Reveal" : "Reveal response"}{" "}
               <kbd className="text-xs opacity-70">R</kbd>
@@ -170,7 +140,7 @@ export default function ClueStage({
               type="button"
               disabled={pending}
               onClick={back}
-              className={`${ACTION} bg-amber-400 text-blue-950 hover:bg-amber-300`}
+              className={`${ACTION} ${TONE.primary}`}
             >
               Back to board <kbd className="text-xs opacity-70">Enter</kbd>
             </button>
@@ -239,13 +209,13 @@ function DailyDoubleForm({
   pending: boolean;
   onSubmit: (uid: string, wager: number) => void;
 }) {
-  const players = Object.entries(game.players ?? {}).sort(([, a], [, b]) => a.joinedAt - b.joinedAt);
+  const players = playersByJoinOrder(game.players);
   const [uid, setUid] = useState(game.current?.ddPlayer ?? players[0]?.[0] ?? "");
   const [wager, setWager] = useState("");
   const score = game.players?.[uid]?.score ?? 0;
   const max = Math.max(score, roundMaxValue(game.round));
-  const amount = Number(wager);
-  const valid = !!uid && wager !== "" && Number.isInteger(amount) && amount >= 5 && amount <= max;
+  const amount = parseWholeNumber(wager, 5, max);
+  const valid = !!uid && amount !== null;
 
   return (
     <form
@@ -293,7 +263,7 @@ function DailyDoubleForm({
       <button
         type="submit"
         disabled={!valid || pending}
-        className={`${ACTION} bg-amber-400 text-blue-950 hover:bg-amber-300`}
+        className={`${ACTION} ${TONE.primary}`}
       >
         Show clue
       </button>

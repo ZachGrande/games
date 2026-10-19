@@ -3,15 +3,15 @@
 import type { User } from "firebase/auth";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getBoard, saveBoard } from "../lib/boards";
+import { getBoard, saveBoard } from "../../../lib/boards";
 import {
   type BoardContent,
   type RoundKey,
   CATEGORY_COUNT,
   ROUND_LABEL,
   clueValue,
-} from "../lib/types";
-import { formatMoney } from "../lib/format";
+} from "../../../lib/types";
+import { formatMoney } from "../../../lib/format";
 
 type Tab = RoundKey | "final";
 

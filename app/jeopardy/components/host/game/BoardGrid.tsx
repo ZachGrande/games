@@ -1,7 +1,7 @@
 "use client";
 
-import { formatMoney } from "../lib/format";
-import { type LiveBoard, CATEGORY_COUNT, CLUE_COUNT, cellKey } from "../lib/types";
+import { formatMoney } from "../../../lib/format";
+import { type LiveBoard, CATEGORY_COUNT, CLUE_COUNT, cellKey } from "../../../lib/types";
 
 export default function BoardGrid({
   board,

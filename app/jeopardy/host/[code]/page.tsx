@@ -1,8 +1,8 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import HostGame from "../../components/HostGame";
-import HostGate from "../../components/HostGate";
+import HostGame from "../../components/host/game/HostGame";
+import HostGate from "../../components/host/HostGate";
 
 export default function HostGamePage() {
   const { code } = useParams<{ code: string }>();

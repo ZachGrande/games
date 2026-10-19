@@ -1,8 +1,8 @@
 "use client";
 
 import type { User } from "firebase/auth";
-import { formatMoney } from "../lib/format";
-import { useGame, useGamePrivate } from "../lib/hooks";
+import { formatMoney } from "../../../lib/format";
+import { useGame, useGamePrivate } from "../../../lib/hooks";
 
 /** Private, read-only view of the current response for the host's phone. */
 export default function AnswerKey({ user, code }: { user: User; code: string }) {

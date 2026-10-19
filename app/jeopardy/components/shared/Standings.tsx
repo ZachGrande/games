@@ -1,7 +1,7 @@
 "use client";
 
-import { formatMoney, ordinal, rankPlayers } from "../lib/format";
-import type { Player } from "../lib/types";
+import { formatMoney, ordinal, rankPlayers } from "../../lib/format";
+import type { Player } from "../../lib/types";
 
 const PODIUM = [
   { place: 1, height: "h-40", color: "bg-amber-400 text-blue-950" },

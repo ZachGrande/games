@@ -1,8 +1,8 @@
 "use client";
 
 import GameShell from "../../components/GameShell";
-import HostDashboard from "../components/HostDashboard";
-import HostGate from "../components/HostGate";
+import HostDashboard from "../components/host/dashboard/HostDashboard";
+import HostGate from "../components/host/HostGate";
 
 export default function JeopardyHostPage() {
   return (

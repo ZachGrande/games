@@ -11,7 +11,7 @@ import {
 import { onValue, ref } from "firebase/database";
 import { useEffect, useState } from "react";
 import { auth, rtdb } from "../../firebase";
-import type { Game, GamePrivate, PlayerSecret } from "./types";
+import { type Game, type GamePrivate, type PlayerSecret, secondsUntil } from "./types";
 
 interface AuthState {
   user: User | null;
@@ -102,6 +102,12 @@ export function useNow(enabled: boolean, intervalMs = 250): number {
     return () => clearInterval(id);
   }, [enabled, intervalMs]);
   return now;
+}
+
+/** Live whole seconds left until a server-clock deadline; ticks only while enabled. */
+export function useCountdown(deadline: number | undefined, serverOffset: number, enabled: boolean): number {
+  const now = useNow(enabled);
+  return secondsUntil(deadline, now + serverOffset);
 }
 
 /** Recently hosted room codes, so a host can get back to a game after a refresh. */

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { CODE_LENGTH, isValidCode, normalizeCode } from "../lib/codes";
+import { CODE_LENGTH, isValidCode, normalizeCode } from "../../lib/codes";
 
 export default function JoinForm() {
   const router = useRouter();

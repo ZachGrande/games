@@ -1,8 +1,8 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import AnswerKey from "../../../components/AnswerKey";
-import HostGate from "../../../components/HostGate";
+import AnswerKey from "../../../components/host/game/AnswerKey";
+import HostGate from "../../../components/host/HostGate";
 
 export default function AnswerKeyPage() {
   const { code } = useParams<{ code: string }>();

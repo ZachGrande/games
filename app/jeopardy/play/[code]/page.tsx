@@ -1,4 +1,4 @@
-import PlayerGame from "../../components/PlayerGame";
+import PlayerGame from "../../components/player/PlayerGame";
 
 export default async function PlayPage(props: PageProps<"/jeopardy/play/[code]">) {
   const { code } = await props.params;

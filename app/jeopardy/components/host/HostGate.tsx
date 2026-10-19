@@ -2,7 +2,7 @@
 
 import type { User } from "firebase/auth";
 import { type ReactNode, useState } from "react";
-import { isGoogleUser, signInWithGoogle, signOutUser, useAuthUser } from "../lib/hooks";
+import { isGoogleUser, signInWithGoogle, signOutUser, useAuthUser } from "../../lib/hooks";
 
 /** Renders children only for a Google-signed-in user (hosts). */
 export default function HostGate({

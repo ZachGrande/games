@@ -1,7 +1,9 @@
 "use client";
 
 import { QRCodeSVG } from "qrcode.react";
-import type { Game } from "../lib/types";
+import { playersByJoinOrder } from "../../../lib/format";
+import type { Game } from "../../../lib/types";
+import PresenceDot from "../../shared/PresenceDot";
 
 export default function HostLobby({
   code,
@@ -17,7 +19,7 @@ export default function HostLobby({
   onKick: (uid: string) => void;
 }) {
   const joinUrl = `${window.location.origin}/jeopardy/play/${code}`;
-  const players = Object.entries(game.players ?? {}).sort(([, a], [, b]) => a.joinedAt - b.joinedAt);
+  const players = playersByJoinOrder(game.players);
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-10 p-6 lg:flex-row lg:gap-16">
@@ -42,9 +44,7 @@ export default function HostLobby({
             {players.map(([uid, p]) => (
               <li key={uid} className="flex items-center justify-between rounded-lg bg-blue-800 px-4 py-2">
                 <span className="flex items-center gap-2 text-lg text-white">
-                  <span
-                    className={`h-2.5 w-2.5 rounded-full ${p.connected === false ? "bg-zinc-500" : "bg-emerald-400"}`}
-                  />
+                  <PresenceDot connected={p.connected !== false} size="md" />
                   {p.name}
                 </span>
                 <button

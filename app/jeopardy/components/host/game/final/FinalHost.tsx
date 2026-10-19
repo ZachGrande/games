@@ -1,6 +1,6 @@
 "use client";
 
-import { formatMoney } from "../lib/format";
+import { formatMoney } from "../../../../lib/format";
 import {
   endGame,
   judgeFinal,
@@ -8,32 +8,17 @@ import {
   showFinalAnswer,
   showFinalClue,
   startFinalReveal,
-} from "../lib/game";
-import { useNow } from "../lib/hooks";
-import { type Game, type GamePrivate, type PlayerSecret, secondsUntil } from "../lib/types";
+} from "../../../../lib/game";
+import { useCountdown } from "../../../../lib/hooks";
+import type { Game } from "../../../../lib/types";
+import Countdown from "../../../shared/Countdown";
+import JudgeButtons from "../../../shared/JudgeButtons";
+import { ACTION_BUTTON as ACTION, TONE } from "../../../shared/ui";
+import { useHostGame } from "../HostGameContext";
 
-const ACTION =
-  "rounded-xl px-6 py-3 text-lg font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
-
-export default function FinalHost({
-  code,
-  game,
-  priv,
-  secrets,
-  serverOffset,
-  pending,
-  act,
-}: {
-  code: string;
-  game: Game;
-  priv: GamePrivate;
-  secrets: Record<string, PlayerSecret> | null | undefined;
-  serverOffset: number;
-  pending: boolean;
-  act: (fn: () => Promise<unknown>) => void;
-}) {
+export default function FinalHost() {
+  const { code, game, priv, secrets, serverOffset, pending, act } = useHostGame();
   const final = game.final!;
-  const now = useNow(final.phase === "answer");
   // Reveal lowest-to-highest by pre-Final score, so rows don't jump as they're judged.
   const preFinalScore = (uid: string) => {
     const shown = final.revealed?.[uid];
@@ -43,7 +28,7 @@ export default function FinalHost({
   const eligible = Object.keys(final.eligible ?? {})
     .filter((uid) => game.players?.[uid])
     .sort((a, b) => preFinalScore(a) - preFinalScore(b));
-  const secondsLeft = secondsUntil(final.deadline, now + serverOffset);
+  const secondsLeft = useCountdown(final.deadline, serverOffset, final.phase === "answer");
 
   const allWagered = eligible.every((uid) => secrets?.[uid]?.wager !== undefined);
   const allAnswered = eligible.every((uid) => secrets?.[uid]?.answer !== undefined);
@@ -62,7 +47,7 @@ export default function FinalHost({
             type="button"
             disabled={pending}
             onClick={() => act(() => showFinalClue(code, priv, serverOffset))}
-            className={`${ACTION} ${allWagered ? "bg-amber-400 text-blue-950 hover:bg-amber-300" : "bg-blue-700 text-white hover:bg-blue-600"}`}
+            className={`${ACTION} ${allWagered ? TONE.primary : TONE.secondary}`}
           >
             {allWagered ? "Show clue & start timer" : "Show clue anyway"}
           </button>
@@ -74,15 +59,13 @@ export default function FinalHost({
           <p className="max-w-5xl font-serif text-3xl font-bold uppercase leading-snug text-white sm:text-5xl">
             {final.clue}
           </p>
-          <p className={`text-6xl font-black tabular-nums ${secondsLeft <= 5 ? "text-red-400" : "text-amber-300"}`}>
-            {secondsLeft}
-          </p>
+          <Countdown seconds={secondsLeft} className="text-6xl" />
           <StatusList game={game} uids={eligible} done={(uid) => secrets?.[uid]?.answer !== undefined} doneLabel="Answered" />
           <button
             type="button"
             disabled={pending}
             onClick={() => act(() => startFinalReveal(code))}
-            className={`${ACTION} ${secondsLeft === 0 || allAnswered ? "bg-amber-400 text-blue-950 hover:bg-amber-300" : "bg-blue-700 text-white hover:bg-blue-600"}`}
+            className={`${ACTION} ${secondsLeft === 0 || allAnswered ? TONE.primary : TONE.secondary}`}
           >
             Reveal responses
           </button>
@@ -109,7 +92,7 @@ export default function FinalHost({
                       type="button"
                       disabled={pending}
                       onClick={() => act(() => revealFinalResponse(code, uid, secret))}
-                      className={`${ACTION} bg-amber-400 text-blue-950 hover:bg-amber-300`}
+                      className={`${ACTION} ${TONE.primary}`}
                     >
                       Show response
                     </button>
@@ -117,24 +100,11 @@ export default function FinalHost({
                     <div className="flex flex-col items-end gap-2">
                       <span className="text-2xl font-bold text-white">{shown.answer || "(no response)"}</span>
                       {shown.correct === undefined ? (
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            disabled={pending}
-                            onClick={() => act(() => judgeFinal(code, uid, wager, true))}
-                            className={`${ACTION} bg-emerald-500 text-white hover:bg-emerald-400`}
-                          >
-                            ✓ Correct
-                          </button>
-                          <button
-                            type="button"
-                            disabled={pending}
-                            onClick={() => act(() => judgeFinal(code, uid, wager, false))}
-                            className={`${ACTION} bg-red-500 text-white hover:bg-red-400`}
-                          >
-                            ✗ Wrong
-                          </button>
-                        </div>
+                        <JudgeButtons
+                          className="flex gap-2"
+                          disabled={pending}
+                          onJudge={(correct) => act(() => judgeFinal(code, uid, wager, correct))}
+                        />
                       ) : (
                         <span className={shown.correct ? "text-emerald-300" : "text-red-300"}>
                           {shown.correct ? "+" : "−"}
@@ -154,7 +124,7 @@ export default function FinalHost({
               type="button"
               disabled={pending}
               onClick={() => act(() => showFinalAnswer(code, priv))}
-              className={`${ACTION} bg-blue-700 text-white hover:bg-blue-600`}
+              className={`${ACTION} ${TONE.secondary}`}
             >
               Reveal correct response
             </button>
@@ -163,7 +133,7 @@ export default function FinalHost({
             type="button"
             disabled={pending || !allJudged}
             onClick={() => act(() => endGame(code))}
-            className={`${ACTION} bg-amber-400 text-blue-950 hover:bg-amber-300`}
+            className={`${ACTION} ${TONE.primary}`}
           >
             Show final standings
           </button>

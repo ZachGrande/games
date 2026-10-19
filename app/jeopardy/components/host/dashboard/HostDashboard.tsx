@@ -4,12 +4,12 @@ import type { User } from "firebase/auth";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { countFilled, createBoard, deleteBoard, emptyBoard, listBoards } from "../lib/boards";
-import { createGame } from "../lib/game";
-import { loadHostedGames, rememberHostedGame, useGame } from "../lib/hooks";
-import { SAMPLE_BOARD } from "../lib/sampleBoard";
-import type { BoardContent, SavedBoard } from "../lib/types";
-import { SignOutButton } from "./HostGate";
+import { countFilled, createBoard, deleteBoard, emptyBoard, listBoards } from "../../../lib/boards";
+import { createGame } from "../../../lib/game";
+import { loadHostedGames, rememberHostedGame, useGame } from "../../../lib/hooks";
+import { SAMPLE_BOARD } from "../../../lib/sampleBoard";
+import type { BoardContent, SavedBoard } from "../../../lib/types";
+import { SignOutButton } from "../HostGate";
 
 const BUTTON =
   "rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800";

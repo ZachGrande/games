@@ -1,7 +1,8 @@
 "use client";
 
-import { formatMoney } from "../lib/format";
-import type { Player } from "../lib/types";
+import { formatMoney, playersByJoinOrder } from "../../lib/format";
+import type { Player } from "../../lib/types";
+import PresenceDot from "./PresenceDot";
 
 export default function Scoreboard({
   players,
@@ -14,7 +15,7 @@ export default function Scoreboard({
   highlightUid?: string;
   onSelectControl?: (uid: string) => void;
 }) {
-  const list = Object.entries(players ?? {}).sort(([, a], [, b]) => a.joinedAt - b.joinedAt);
+  const list = playersByJoinOrder(players);
   if (list.length === 0) return null;
 
   return (
@@ -37,10 +38,7 @@ export default function Scoreboard({
             } ${onSelectControl ? "hover:bg-blue-700" : ""}`}
           >
             <span className="flex items-center gap-1.5 text-sm font-medium text-white">
-              <span
-                className={`h-2 w-2 rounded-full ${p.connected === false ? "bg-zinc-500" : "bg-emerald-400"}`}
-                aria-label={p.connected === false ? "offline" : "online"}
-              />
+              <PresenceDot connected={p.connected !== false} />
               {p.name}
               {hasControl && <span aria-label="has control">★</span>}
             </span>

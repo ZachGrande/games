@@ -2,24 +2,14 @@
 
 import { QRCodeSVG } from "qrcode.react";
 import { useState } from "react";
-import { formatMoney } from "../lib/format";
-import { kickPlayer, setScore } from "../lib/game";
-import type { Game } from "../lib/types";
+import { formatMoney, parseWholeNumber, playersByJoinOrder } from "../../../lib/format";
+import { kickPlayer, setScore } from "../../../lib/game";
+import PresenceDot from "../../shared/PresenceDot";
+import { useHostGame } from "./HostGameContext";
 
-export default function HostTools({
-  code,
-  game,
-  pending,
-  act,
-  onClose,
-}: {
-  code: string;
-  game: Game;
-  pending: boolean;
-  act: (fn: () => Promise<unknown>) => void;
-  onClose: () => void;
-}) {
-  const players = Object.entries(game.players ?? {}).sort(([, a], [, b]) => a.joinedAt - b.joinedAt);
+export default function HostTools({ onClose }: { onClose: () => void }) {
+  const { code, game, pending, act } = useHostGame();
+  const players = playersByJoinOrder(game.players);
   const keyUrl = `${window.location.origin}/jeopardy/host/${code}/key`;
 
   return (
@@ -89,8 +79,8 @@ function ScoreRow({
   onKick: () => void;
 }) {
   const [draft, setDraft] = useState(String(score));
-  const parsed = Number(draft);
-  const changed = draft !== "" && Number.isInteger(parsed) && parsed !== score;
+  const parsed = parseWholeNumber(draft);
+  const changed = parsed !== null && parsed !== score;
 
   return (
     <form
@@ -101,7 +91,7 @@ function ScoreRow({
       }}
     >
       <span className="flex min-w-32 flex-1 items-center gap-2">
-        <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-400" : "bg-zinc-500"}`} />
+        <PresenceDot connected={connected} />
         {name}
         <span className="text-sm text-blue-300">{formatMoney(score)}</span>
       </span>
