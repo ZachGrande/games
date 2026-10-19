@@ -16,6 +16,11 @@ const games = [
     title: "2048",
     description: "Slide the tiles and merge your way to 2048.",
   },
+  {
+    href: "/jeopardy",
+    title: "Jeopardy!",
+    description: "Host a live trivia game; friends buzz in from their phones.",
+  },
 ];
 
 export default function Home() {

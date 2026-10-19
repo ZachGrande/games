@@ -52,6 +52,33 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Jeopardy boards: private to the Google-signed-in host who owns them.
+    // Fields: ownerUid (== author), title (1..80 chars), rounds (map),
+    // final (map), updatedAt (server timestamp).
+    function isGoogleUser() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider == 'google.com';
+    }
+
+    function isValidBoard() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['ownerUid', 'title', 'rounds', 'final', 'updatedAt'])
+        && d.keys().hasAll(['ownerUid', 'title', 'rounds', 'final', 'updatedAt'])
+        && d.ownerUid == request.auth.uid
+        && d.title is string && d.title.size() >= 1 && d.title.size() <= 80
+        && d.rounds is map && d.final is map
+        && d.updatedAt == request.time;
+    }
+
+    match /jeopardyBoards/{boardId} {
+      allow read, delete: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid;
+      allow create: if isGoogleUser() && isValidBoard();
+      allow update: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid
+        && isValidBoard();
+    }
+
     // Everything else is denied by default.
     match /{document=**} {
       allow read, write: if false;

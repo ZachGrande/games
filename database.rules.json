@@ -1,0 +1,74 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "games": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((data.exists() && data.child('hostUid').val() === auth.uid && (!newData.exists() || newData.child('hostUid').val() === auth.uid)) || (auth.token.firebase.sign_in_provider === 'google.com' && newData.child('hostUid').val() === auth.uid && (!data.exists() || data.child('createdAt').val() < now - 43200000)))",
+        ".validate": "$code.matches(/^[A-HJ-NP-Z]{4}$/) && newData.hasChildren(['hostUid', 'title', 'status', 'createdAt'])",
+
+        "hostUid": { ".validate": "newData.isString()" },
+        "title": { ".validate": "newData.isString() && newData.val().length <= 80" },
+        "createdAt": { ".validate": "newData.isNumber() && (newData.val() === now || newData.val() === data.val())" },
+        "status": { ".validate": "newData.isString() && newData.val().matches(/^(lobby|playing|final|ended)$/)" },
+        "round": { ".validate": "newData.val() === 'single' || newData.val() === 'double'" },
+        "board": {},
+        "controlUid": { ".validate": "newData.isString()" },
+        "current": {},
+        "final": {},
+        "kicked": {
+          "$uid": { ".validate": "newData.val() === true" }
+        },
+
+        "players": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && !root.child('games/' + $code + '/kicked/' + $uid).exists() && root.child('games/' + $code + '/status').val() !== 'ended' && newData.child('score').val() === (data.exists() ? data.child('score').val() : 0)",
+            ".validate": "newData.hasChildren(['name', 'score', 'joinedAt'])",
+            "name": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
+            "score": { ".validate": "newData.isNumber()" },
+            "joinedAt": { ".validate": "newData.isNumber()" },
+            "connected": { ".validate": "newData.isBoolean()" },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "buzzes": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('games/' + $code + '/current/phase').val() === 'open' && root.child('games/' + $code + '/players/' + $uid).exists()",
+            ".validate": "newData.isNumber() && newData.val() === now"
+          }
+        },
+
+        "$other": { ".validate": false }
+      }
+    },
+
+    "gamePrivate": {
+      "$code": {
+        ".read": "auth != null && root.child('games/' + $code + '/hostUid').val() === auth.uid",
+        ".write": "auth != null && (root.child('games/' + $code + '/hostUid').val() === auth.uid || newData.parent().parent().child('games/' + $code + '/hostUid').val() === auth.uid)"
+      }
+    },
+
+    "gameSecrets": {
+      "$code": {
+        ".read": "auth != null && root.child('games/' + $code + '/hostUid').val() === auth.uid",
+        ".write": "auth != null && (root.child('games/' + $code + '/hostUid').val() === auth.uid || newData.parent().parent().child('games/' + $code + '/hostUid').val() === auth.uid)",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          "wager": {
+            ".write": "auth != null && auth.uid === $uid && root.child('games/' + $code + '/final/phase').val() === 'wager' && root.child('games/' + $code + '/players/' + $uid + '/score').val() > 0",
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() % 1 === 0 && newData.val() <= root.child('games/' + $code + '/players/' + $uid + '/score').val()"
+          },
+          "answer": {
+            ".write": "auth != null && auth.uid === $uid && root.child('games/' + $code + '/final/phase').val() === 'answer' && data.parent().child('wager').exists() && now <= root.child('games/' + $code + '/final/deadline').val() + 3000",
+            ".validate": "newData.isString() && newData.val().length <= 200"
+          },
+          "$other": { ".validate": false }
+        }
+      }
+    }
+  }
+}
